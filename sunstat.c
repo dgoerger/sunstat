@@ -1,137 +1,224 @@
-/* +++Date last modified: 05-Jul-1997 */
-/* Updated comments, 05-Aug-2013 */
-
 /*
-
-SUNRISET.C - computes Sun rise/set times, start/end of twilight, and
-             the length of the day at any date and latitude
-
-Written as DAYLEN.C, 1989-08-16
-
-Modified to SUNRISET.C, 1992-12-01
-Split to a header file, 2017-12-10, by Joachim Nilsson
-
-(c) Paul Schlyter, 1989, 1992
-
-Released to the public domain by Paul Schlyter, December 1992
-
-*/
-
+ * Simple SUNRISET application
+ *
+ * (c) Paul Schlyter, 1989 - December 1992, released to the public domain
+ * (c) Joachim Nilsson, December 2017, released to the public domain
+ * (c) David Goerger, January 2020, released to the public domain
+ *
+ */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <err.h>
+#include <getopt.h>
 #include <math.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+
+#include "config.h"
 #include "sunriset.h"
 
+static time_t now;
+static struct tm *tm;
+extern char *__progname;
 
-/* A small test program */
-#ifndef SUNRISET_LIB
-int main(void)
+static int usage(int code)
 {
-      int year,month,day;
-      double lon, lat;
-      double daylen, civlen, nautlen, astrlen;
-      double rise, set, civ_start, civ_end, naut_start, naut_end,
-             astr_start, astr_end;
-      int    rs, civ, naut, astr;
-      char buf[80];
+        printf("Usage:\n"
+               "  %s +/-latitude +/-longitude\n"
+               "\n"
+               "Examples:\n"
+               "    %s +40.6611 -73.9439 (use $TZ || /etc/localtime)\n"
+	       "    TZ='Americas/New_York' %s +40.6611 -73.9439\n"
+	       "    TZ='UTC' %s +40.6611 -73.9439\n"
+               "\n", __progname, __progname, __progname, __progname);
 
-      printf( "Latitude (+ is north) and longitude (+ is east) : " );
-      fgets(buf, 80, stdin);
-      sscanf(buf, "%lf %lf", &lat, &lon );
-
-      for(;;)
-      {
-            printf( "Input date ( yyyy mm dd ) (ctrl-C exits): " );
-            fgets(buf, 80, stdin);
-            sscanf(buf, "%d %d %d", &year, &month, &day );
-
-            daylen  = day_length(year,month,day,lon,lat);
-            civlen  = day_civil_twilight_length(year,month,day,lon,lat);
-            nautlen = day_nautical_twilight_length(year,month,day,lon,lat);
-            astrlen = day_astronomical_twilight_length(year,month,day,
-                  lon,lat);
-
-            printf( "Day length:                 %5.2f hours\n", daylen );
-            printf( "With civil twilight         %5.2f hours\n", civlen );
-            printf( "With nautical twilight      %5.2f hours\n", nautlen );
-            printf( "With astronomical twilight  %5.2f hours\n", astrlen );
-            printf( "Length of twilight: civil   %5.2f hours\n",
-                  (civlen-daylen)/2.0);
-            printf( "                  nautical  %5.2f hours\n",
-                  (nautlen-daylen)/2.0);
-            printf( "              astronomical  %5.2f hours\n",
-                  (astrlen-daylen)/2.0);
-
-            rs   = sun_rise_set         ( year, month, day, lon, lat,
-                                          &rise, &set );
-            civ  = civil_twilight       ( year, month, day, lon, lat,
-                                          &civ_start, &civ_end );
-            naut = nautical_twilight    ( year, month, day, lon, lat,
-                                          &naut_start, &naut_end );
-            astr = astronomical_twilight( year, month, day, lon, lat,
-                                          &astr_start, &astr_end );
-
-            printf( "Sun at south %5.2fh UT\n", (rise+set)/2.0 );
-
-            switch( rs )
-            {
-                case 0:
-                    printf( "Sun rises %5.2fh UT, sets %5.2fh UT\n",
-                             rise, set );
-                    break;
-                case +1:
-                    printf( "Sun above horizon\n" );
-                    break;
-                case -1:
-                    printf( "Sun below horizon\n" );
-                    break;
-            }
-
-            switch( civ )
-            {
-                case 0:
-                    printf( "Civil twilight starts %5.2fh, "
-                            "ends %5.2fh UT\n", civ_start, civ_end );
-                    break;
-                case +1:
-                    printf( "Never darker than civil twilight\n" );
-                    break;
-                case -1:
-                    printf( "Never as bright as civil twilight\n" );
-                    break;
-            }
-
-            switch( naut )
-            {
-                case 0:
-                    printf( "Nautical twilight starts %5.2fh, "
-                            "ends %5.2fh UT\n", naut_start, naut_end );
-                    break;
-                case +1:
-                    printf( "Never darker than nautical twilight\n" );
-                    break;
-                case -1:
-                    printf( "Never as bright as nautical twilight\n" );
-                    break;
-            }
-
-            switch( astr )
-            {
-                case 0:
-                    printf( "Astronomical twilight starts %5.2fh, "
-                            "ends %5.2fh UT\n", astr_start, astr_end );
-                    break;
-                case +1:
-                    printf( "Never darker than astronomical twilight\n" );
-                    break;
-                case -1:
-                    printf( "Never as bright as astronomical twilight\n" );
-                    break;
-            }
-      return 0;
-      }
+        return code;
 }
-#endif /* SUNRISET_LIB */
+
+static time_t timediff(void)
+{
+	static time_t diff;
+
+	diff = tm->tm_gmtoff;
+
+	return diff;
+}
+
+static void convert(double ut, int *h, int *m)
+{
+	/*
+	 * NOTE: this doesn't reflow hours/minutes
+	 *        when coordinates aren't within TZ,
+	 *        e.g. TZ='Asia/Tokyo' => sunset
+	 *        in New York City occurs "30:43 JST"
+	 */
+
+	*h = (int)floor(ut);
+	*m = (int)(60 * (ut - floor(ut)));
+
+	*m += (timediff() % 3600)/60;
+	*h += timediff() / 3600;
+}
+
+static char *lctime_r(double ut, char *buf, size_t len)
+{
+	int h, m;
+
+	convert(ut, &h, &m);
+	snprintf(buf, len, "%02d:%02d", h, m);
+
+	return buf;
+}
+
+static char *lctime(double ut)
+{
+	static char buf[10];
+
+	return lctime_r(ut, buf, sizeof(buf));
+}
+
+static char *hours_to_s(double ut)
+{
+	int h, m = 0, s = 0;
+	static char buf[10];
+
+	h = (int)floor(ut);
+	m = (int)(60 * (ut - floor(ut)));
+	s = (int)(60 * ((60 * (ut - floor(ut))) - m));
+
+	snprintf(buf, sizeof(buf), "%02dh%02dm%02ds", h, m, s);
+	return buf;
+}
+
+static int all(double lat, double lon, int year, int month, int day)
+{
+	double daylen, civlen, nautlen, astrlen;
+	double rise, set, civ_start, civ_end, naut_start, naut_end;
+	double astr_start, astr_end;
+	int rs, civ, naut, astr;
+	char bufr[10], bufs[10], civtwilen[10], nauttwilen[10], astrtwilen[10];
+
+	daylen = day_length(year, month, day, lon, lat);
+	civlen = day_civil_twilight_length(year, month, day, lon, lat);
+	nautlen = day_nautical_twilight_length(year, month, day, lon, lat);
+	astrlen = day_astronomical_twilight_length(year, month, day, lon, lat);
+
+	snprintf(civtwilen, sizeof(civtwilen), "%s", hours_to_s((civlen - daylen) / 2.0));
+	snprintf(nauttwilen, sizeof(nauttwilen), "%s", hours_to_s((nautlen - daylen) / 2.0));
+	snprintf(astrtwilen, sizeof(astrtwilen), "%s", hours_to_s((astrlen - daylen) / 2.0));
+
+	rs = sun_rise_set(year, month, day, lon, lat, &rise, &set);
+	civ = civil_twilight(year, month, day, lon, lat, &civ_start, &civ_end);
+	naut = nautical_twilight(year, month, day, lon, lat, &naut_start, &naut_end);
+	astr = astronomical_twilight(year, month, day, lon, lat, &astr_start, &astr_end);
+
+	printf("              Sunrise     Sunset\n");
+	switch (rs) {
+	case 0:
+		printf("              %s %s   %s %s\n",
+		       lctime_r(rise, bufr, sizeof(bufr)), tm->tm_zone,
+		       lctime_r(set, bufs, sizeof(bufs)), tm->tm_zone);
+		break;
+
+	case +1:
+		printf("              ---         (none)\n");
+		break;
+
+	case -1:
+		printf("              (none)      ---\n");
+		break;
+	}
+
+	switch (civ) {
+	case 0:
+		printf("       Civil  %s %s   %s %s\n",
+		       lctime_r(civ_start, bufr, sizeof(bufr)), tm->tm_zone,
+		       lctime_r(civ_end, bufs, sizeof(bufs)), tm->tm_zone);
+		break;
+
+	case +1:
+		printf("       Civil  ---         (none)\n");
+		break;
+
+	case -1:
+		printf("       Civil  (none)      ---\n");
+		break;
+	}
+
+	switch (naut) {
+	case 0:
+		printf("    Nautical  %s %s   %s %s\n",
+		       lctime_r(naut_start, bufr, sizeof(bufr)), tm->tm_zone,
+		       lctime_r(naut_end, bufs, sizeof(bufs)), tm->tm_zone);
+		break;
+
+	case +1:
+		printf("    Nautical  ---         (none)\n");
+		break;
+
+	case -1:
+		printf("    Nautical  (none)      ---\n");
+		break;
+	}
+
+	switch (astr) {
+	case 0:
+		printf("Astronomical  %s %s   %s %s\n\n",
+		       lctime_r(astr_start, bufr, sizeof(bufr)), tm->tm_zone,
+		       lctime_r(astr_end, bufs, sizeof(bufs)), tm->tm_zone);
+		break;
+
+	case +1:
+		printf("Astronomical  ---         (none)\n\n");
+		break;
+
+	case -1:
+		printf("Astronomical  (none)      ---\n\n");
+		break;
+	}
+
+	printf("              Daylight    Twilight\n");
+	printf("              %s   ---\n", hours_to_s(daylen));
+	printf("       Civil  %s   %s\n", hours_to_s(civlen), civtwilen);
+	printf("    Nautical  %s   %s\n", hours_to_s(nautlen), nauttwilen);
+	printf("Astronomical  %s   %s\n\n", hours_to_s(astrlen), astrtwilen);
+
+	printf("The Sun is overhead (due south/north) at %s %s.\n", lctime((rise + set) / 2.0), tm->tm_zone);
+	return 0;
+}
+
+int main(int argc, char *argv[])
+{
+#ifdef HAVE_PLEDGE
+	if (pledge("stdio", NULL) == -1)
+		err(1, "pledge");
+#endif
+
+	int year = 2000, month = 1, day = 1;
+	double lon = 0.0, lat = 0.0;
+
+	now = time(NULL);
+	tm = localtime(&now);
+
+	if (optind < argc) {
+		lat = atof(argv[optind++]);
+	} else {
+		return usage(1);
+	}
+	if (optind < argc) {
+		lon = atof(argv[optind]);
+	} else {
+		return usage(1);
+	}
+
+	year = 1900 + tm->tm_year;
+	month = 1 + tm->tm_mon;
+	day = tm->tm_mday;
+
+	return all(lat, lon, year, month, day);
+}
 
 /* The "workhorse" function for sun rise/set times */
 
@@ -217,8 +304,6 @@ int __sunriset__( int year, int month, int day, double lon, double lat,
 
       return rc;
 }  /* __sunriset__ */
-
-
 
 /* The "workhorse" function */
 

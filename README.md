@@ -1,115 +1,62 @@
 About
 -----
 
-Simple public domain library and application that shows sunset and
-sunrise based on your latitude,longitude.  The application can also
-be used with cron to run a script, see section Goal below.
+sunstat is a simple public domain application that shows sunset and 
+sunrise based on your latitude and longitude.
 
-The library, which can be used entirely stand-alone, is based on the
-excellent code by [Paul Schlyter][].
+The sunriset library is based on the excellent code by [Paul 
+Schlyter](http://stjarnhimlen.se/). sunstat is based on the sun 
+application by [Joachim Nilsson](https://github.com/troglobit).
 
 
-Example
--------
+Build
+-----
 
-Without any arguments the `sun` goes dumpster diving in system files
-`/etc/timezone` and `/usr/share/zoneinfo/zone.tab` to figure out
-your latitude and longitude.
-
-On my system, in mid December here in Sweden, the result is:
+Compilation follows the usual "./configure; make; make install" 
+semantics.
 
 ```sh
-$ cat /etc/timezone
-Europe/Stockholm
-$ sun
-Sun rises 07:31, sets 13:49 UTC
+$ ./configure
+checking for C compiler... cc
+checking for pledge... yes
+creating Makefile... done
+ersa$ make
+cc -DHAVE_CONFIG -Wall -Wextra -g -O2  -c sunstat.c
+cc -static -o sunstat sunstat.o -lm
+$ doas make install
+install -d /usr/local/bin
+install -s -o root -g bin -m 0755 sunstat /usr/local/bin
 ```
-
-You can set the environment variable `TZ` to check other locations:
-
-```sh
-$ TZ="Africa/Luanda" sun
-Sun rises 04:42, sets 17:18 UTC
-```
-
-For more precision, you can of course provide your exact latitude and
-longitude.  See the built-in usage text for more help: `sun -h`
-
-
-Cron
-----
-
-To launch applications at sunrise/sunset using cron, simply:
-
-```sh
-$ crontab -e
-01 00 * * * sun -r -w -o -30m; play english.au
-```
-
-This plays Linus Torvalds' classic audio file 30 minutes before sunrise.
-
-**NOTE:** You may want to set the `$PATH` in your crontab, or use an
-  absolute path to your programs, otherwise cron will not find them.
 
 
 Usage
 -----
 
 ```
+$ sunstat
 Usage:
-  sun [-ahirsw] [-o OFFSET] [+/-latitude +/-longitude]
+  sunstat +/-latitude +/-longitude
 
-Options:
-  -a      Show all relevant times and exit
-  -l      Increased verbosity, enable log messages
-  -h      This help text
-  -i      Interactive mode
-  -r      Sunrise mode
-  -s      Sunset mode
-  -u      Use UTC everywhere, not local time
-  -v      Show program version and exit
-  -w      Wait until sunset or sunrise
-  -o ARG  Time offset to adjust wait, e.g. -o -30m
-          maximum allowed offset: +/- 6h
+Examples:
+    sunstat +40.6611 -73.9439 (use $TZ || /etc/localtime)
+    TZ='America/New_York' sunstat +40.6611 -73.9439
+    TZ='UTC' sunstat +40.6611 -73.9439
 
-Bug report address: https://github.com/troglobit/sun/issues
+$ # print today's sunrise/sunset times
+$ # .. for Minneapolis
+$
+$ TZ='America/Chicago' sunstat +44.9819 -93.2692
+              Sunrise     Sunset
+              07:51 CST   16:45 CST
+       Civil  07:17 CST   17:19 CST
+    Nautical  06:40 CST   17:55 CST
+Astronomical  06:05 CST   18:31 CST
+
+              Daylight    Twilight
+              08h54m42s   ---
+       Civil  10h01m18s   00h33m17s
+    Nautical  11h15m07s   01h10m12s
+Astronomical  12h26m11s   01h45m44s
+
+The Sun is overhead (due south/north) at 12:18 CST.
 ```
-
-
-Goal
-----
-
-The goal of this project is to provide just enough intelligence to
-my home automation system so it can control the indoor lights, which
-are operated using 433 MHz outlet switches.
-
-
-Building
---------
-
-The `sun` is built with the GNU configure and build system.  Simply run
-the following commands to build and install:
-
-```sh
-$ ./configure
-$ make
-$ sudo make install
-```
-
-The `sunriset.c` code can be built as a library, use `--enable-library`
-with the configure script to enable this optional feature.
-
-If you built from GIT, or have modified any of the `.ac` or `.am` files,
-you have to run the following to (re-)create the configure script:
-
-```sh
-.$ /autogen.sh
-```
-
-For that to work you need to have `autoconf`, `automake`, and `libtool`
-installed.  These tools are not needed when building from an official
-released tarball.
-
-
-
-[Paul Schlyter]: http://stjarnhimlen.se/
