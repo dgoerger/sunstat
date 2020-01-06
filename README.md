@@ -60,3 +60,22 @@ Astronomical  12h26m11s   01h45m44s
 
 The Sun is overhead (due south/north) at 12:18 CST.
 ```
+
+Compatibility
+-------------
+
+Tested on
+
+  - OpenBSD 6.6
+
+  - CentOS 8.1
+
+  - Fedora 30
+
+  - Debian 10.2
+
+  - Alpine 3.11.2
+
+  - macOS Catalina 10.15.1
+
+  - NetBSD 8.1
