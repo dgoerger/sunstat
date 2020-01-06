@@ -20,9 +20,9 @@ $ ./configure
 checking for C compiler... cc
 checking for pledge... yes
 creating Makefile... done
-ersa$ make
+$ make
 cc -DHAVE_CONFIG -Wall -Wextra -g -O2  -c sunstat.c
-cc -static -o sunstat sunstat.o -lm
+cc -o sunstat sunstat.o -lm
 $ doas make install
 install -d /usr/local/bin
 install -s -o root -g bin -m 0755 sunstat /usr/local/bin

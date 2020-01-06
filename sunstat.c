@@ -30,7 +30,7 @@ static int usage(int code)
                "\n"
                "Examples:\n"
                "    %s +40.6611 -73.9439 (use $TZ || /etc/localtime)\n"
-	       "    TZ='Americas/New_York' %s +40.6611 -73.9439\n"
+	       "    TZ='America/New_York' %s +40.6611 -73.9439\n"
 	       "    TZ='UTC' %s +40.6611 -73.9439\n"
                "\n", __progname, __progname, __progname, __progname);
 
