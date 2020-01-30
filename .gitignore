@@ -3,4 +3,4 @@
 *.o
 Makefile
 config.h
-sun
+sunstat

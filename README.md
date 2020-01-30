@@ -46,19 +46,14 @@ $ # print today's sunrise/sunset times
 $ # .. for Minneapolis
 $
 $ TZ='America/Chicago' sunstat +44.9819 -93.2692
-              Sunrise     Sunset
-              07:51 CST   16:45 CST
-       Civil  07:17 CST   17:19 CST
-    Nautical  06:40 CST   17:55 CST
-Astronomical  06:05 CST   18:31 CST
+                       Sunrise     Sunset
+                       07:35 CST   17:17 CST
+       Civil twilight  07:03 CST   17:48 CST
+    Nautical twilight  06:28 CST   18:24 CST
+Astronomical twilight  05:54 CST   18:58 CST
 
-              Daylight    Twilight
-              08h54m42s   ---
-       Civil  10h01m18s   00h33m17s
-    Nautical  11h15m07s   01h10m12s
-Astronomical  12h26m11s   01h45m44s
-
-The Sun is overhead (due south/north) at 12:18 CST.
+Hours of daylight, incl. civil twilight: 10h44m58s.
+The Sun is overhead (due south/north) at 12:26 CST.
 ```
 
 Compatibility
